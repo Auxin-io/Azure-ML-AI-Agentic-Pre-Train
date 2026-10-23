@@ -1,46 +1,18 @@
-# Train a new model from scratch on Azure ML
+# Pre-Train on Azure
 
-> **Four repos, run in this order.** Ingestion first — the other three read its
-> output. After that they are independent and can be done in any order, or skipped.
-> 
-> 1. [Azure-Data-Ingestion](https://github.com/Auxin-io/Azure-Data-Ingestion#readme) — generates the PDFs, OCRs them with Document Intelligence, writes the training data
-> 2. **Azure-ML-AI-Agentic-Pre-Train** ← you are here — trains a model from random weights on Azure ML, serves it, wraps it in a Foundry agent
-> 3. [Azure-ML-AI-Agentic-Fine-Tune](https://github.com/Auxin-io/Azure-ML-AI-Agentic-Fine-Tune#readme) — fine-tunes Qwen2.5-3B on Azure ML, serves it, wraps it in a Foundry agent
-> 4. [Azure-AI-Agentic-RAG](https://github.com/Auxin-io/Azure-AI-Agentic-RAG#readme) — retrieval over HR documents with a Foundry agent; no training at all
+This repo trains a brand-new language model from random weights on the employee documents, then
+puts an agent in front of it.
 
-```mermaid
-flowchart LR
-    ING["1 · Data-Ingestion<br/>PDFs → OCR → datasets<br/>(required first)"]
-    PT["2 · Agentic Pre-Train<br/>knowledge in the weights<br/>(you are here)"]
-    FT["3 · Agentic Fine-Tune<br/>knowledge in adapter weights"]
-    RAG["4 · Agentic RAG<br/>knowledge in an index"]
-
-    ING -->|"employee"| PT
-    ING -->|"finance"| FT
-    ING -->|"hr"| RAG
-
-    style ING fill:#fde8d7,stroke:#b4651a,stroke-width:2px,color:#3a1f08
-    style PT fill:#dbeafe,stroke:#2b5fc9,stroke-width:3px,color:#0b1b3a
-    style FT fill:#eef0f4,stroke:#9aa3b2,stroke-width:1px,color:#3a4050
-    style RAG fill:#eef0f4,stroke:#9aa3b2,stroke-width:1px,color:#3a4050
-    linkStyle 0 stroke:#2b5fc9,stroke-width:2.5px
-```
-
-🔵 this repo · 🟠 run this one first · ⚪ not needed here
-
-In this project we trains a **new language model from random weights** on the ten employee documents
-(timesheets and expense reports), serves it from an Azure ML managed online
-endpoint, and puts a Foundry agent in front of it. The model answers
-employee questions from its own weights.
+What it does:
+- Takes the **employee dataset** from [Azure-Data-Ingestion](https://github.com/Auxin-io/Azure-Data-Ingestion)
+- Trains a 3.2M-parameter transformer from random weights on Azure ML — no pretrained checkpoint
+- Serves it from a managed online endpoint and wraps it in a Foundry agent
 
 ```
 Blob (employee JSONL)  ->  Azure ML job: causal Transformer from scratch (T4, 77 s)  ->  Model registry
                                                                                              |
 User -> Foundry agent (gpt-4.1-mini) -> OpenAPI tool -> Managed online endpoint (CPU) <------+
 ```
-
-Training data comes from the
-[Azure-Data-Ingestion](https://github.com/Auxin-io/Azure-Data-Ingestion).
 
 ---
 
@@ -94,7 +66,9 @@ the hour in our case).
 
 ---
 
-## Step 1 — infrastructure
+## How To Setup
+
+### Step 1 — infrastructure
 
 ```bash
 cd terraform
@@ -126,7 +100,7 @@ eval "$(terraform -chdir=terraform output -raw agent_env)"
 
 ---
 
-## Step 2 — data
+### Step 2 — data
 
 Register the three Blob files as data assets. They are read through the
 credential-less datastore:
@@ -141,7 +115,7 @@ cd ..
 
 ---
 
-## Step 3 — train
+### Step 3 — train
 
 ```bash
 cd training
@@ -169,7 +143,7 @@ Studio → job → *Outputs + logs → user_logs/std_log.txt*.
 
 ---
 
-## Step 4 — register and serve
+### Step 4 — register and serve
 
 ```bash
 az ml model create -g <ml-rg> -w <workspace> \
@@ -200,7 +174,7 @@ A  Jonas Weber (EMP-8373) logged 42.2 hours for the week ending 2026-05-04.
 
 ---
 
-## Step 5 — the Foundry agent
+### Step 5 — the Foundry agent
 
 ```bash
 cd ../foundry
@@ -231,7 +205,7 @@ Agents → `employee-agent` → Save as new agent → Playground.
 
 ---
 
-## Step 6 — publish to Microsoft 365 Copilot
+### Step 6 — publish to Microsoft 365 Copilot
 
 In the migrated agent click **Publish → Teams and Microsoft 365**, fill in the
 descriptions, keep the generated bot name, and finish. This creates an Azure
